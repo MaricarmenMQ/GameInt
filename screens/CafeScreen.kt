@@ -1,33 +1,34 @@
 package com.example.mycafe.screens
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.mycafe.data.*
 import kotlinx.coroutines.delay
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.lazy.items
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.lazy.items
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
-import androidx.compose.foundation.lazy.LazyRow
+
 @Composable
 fun CafeScreen(
     gameState: GameState,
@@ -41,295 +42,324 @@ fun CafeScreen(
 ) {
     val eficiencia = GameLogic.calcularEficiencia(gameState.personaje, necesidades)
 
-    Row(
+    // Layout en columna para mejor distribución en móvil
+    Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFFFF8E1), // Crema claro
+                        Color(0xFFFFE0B2)  // Naranja muy claro
+                    )
+                )
+            )
             .padding(8.dp)
     ) {
-        // Panel de clientes mejorado
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight()
-        ) {
-            // Estado del café y estadísticas
-            CafeStatsCard(
-                gameState = gameState,
-                eficiencia = eficiencia,
-                clientesActivos = clientesActivos.size
+
+        // 1. Panel superior compacto con stats
+        CafeHeaderCompacto(gameState, eficiencia, clientesActivos.size)
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 2. Fila de clientes - más visual y compacta
+        if (clientesActivos.isNotEmpty()) {
+            Text(
+                "🧑‍🤝‍🧑 Clientes esperando:",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF5D4037)
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // Lista de clientes con animaciones
             LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
             ) {
                 items(clientesActivos) { cliente ->
-                    ClienteCardAnimated(
+                    ClienteCardMejorada(
                         cliente = cliente,
                         isSelected = clienteSeleccionado == cliente.id,
                         onClick = { onClienteSeleccionado(cliente.id) }
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Inventario
-            InventarioCard(gameState.inventario)
-
-            // Botón para comprar ingredientes
-            if (gameState.dinero >= 50) {
-                Button(
-                    onClick = {
-                        val nuevoInventario = gameState.inventario.copy(
-                            ingredientesBasicos = gameState.inventario.ingredientesBasicos + 20,
-                            ingredientesPremium = gameState.inventario.ingredientesPremium + 10,
-                            pasteles = gameState.inventario.pasteles + 5,
-                            galletas = gameState.inventario.galletas + 8
-                        )
-                        onGameStateChanged(
-                            gameState.copy(
-                                inventario = nuevoInventario,
-                                dinero = gameState.dinero - 50
-                            )
-                        )
-                        onNotificacion("Ingredientes comprados por $50")
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("🛒 Comprar Ingredientes ($50)", fontSize = 10.sp)
-                }
-            }
+        } else {
+            // Estado vacío más atractivo
+            EstadoSinClientesMejorado()
         }
 
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // Estación de trabajo mejorada
-        Column(
-            modifier = Modifier
-                .weight(1.5f)
-                .fillMaxHeight()
-        ) {
+        // 3. Estación de trabajo - ocupa el resto del espacio
+        Box(modifier = Modifier.weight(1f)) {
             val clienteActual = clientesActivos.find { it.id == clienteSeleccionado }
 
             if (clienteActual != null) {
-                EstacionTrabajoMejorada(
+                EstacionTrabajoVisual(
                     cliente = clienteActual,
                     eficiencia = eficiencia,
                     inventario = gameState.inventario,
                     onPasoCompletado = { clienteActualizado ->
-                        if (clienteActualizado.pasoActual >= clienteActualizado.pasos.size) {
-                            // Cliente completado - calcular propina
-                            val tiempoServicio = 3000L // Simulado por ahora
-                            val propina = GameLogic.calcularPropina(tiempoServicio, clienteActualizado)
-                            val gananciaTotal = clienteActualizado.precio + propina
-                            val experienciaGanada = when (clienteActualizado.tipoCliente) {
-                                TipoCliente.VIP -> 15
-                                TipoCliente.IMPACIENTE -> 10
-                                else -> 5
-                            }
-
-                            // Consumir ingredientes
-                            val nuevoInventario = gameState.inventario.consumirIngredientes(clienteActualizado.pasos)
-
-                            // Actualizar estado
-                            val nuevoGameState = gameState.copy(
-                                dinero = gameState.dinero + gananciaTotal,
-                                experiencia = gameState.experiencia + experienciaGanada,
-                                clientesServidos = gameState.clientesServidos + 1,
-                                inventario = nuevoInventario
-                            ).subirNivel()
-
-                            onGameStateChanged(nuevoGameState)
-                            onClientesChanged(clientesActivos.filter { it.id != clienteActualizado.id })
-                            onClienteSeleccionado(null)
-
-                            val mensaje = if (propina > 0) {
-                                "+$${gananciaTotal} (incluye $${propina} propina!)"
-                            } else {
-                                "+$${gananciaTotal} ganados"
-                            }
-                            onNotificacion(mensaje)
-                        } else {
-                            onClientesChanged(
-                                clientesActivos.map {
-                                    if (it.id == clienteActualizado.id) clienteActualizado else it
-                                }
-                            )
-                        }
+                        procesarClienteCompletado(
+                            clienteActualizado = clienteActualizado,
+                            clientesActivos = clientesActivos,
+                            gameState = gameState,
+                            onGameStateChanged = onGameStateChanged,
+                            onClientesChanged = onClientesChanged,
+                            onClienteSeleccionado = onClienteSeleccionado,
+                            onNotificacion = onNotificacion
+                        )
                     }
                 )
             } else {
-                EstacionVaciaAnimada()
+                EstacionVaciaAnimadaMejorada()
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 4. Panel inferior con inventario y acciones rápidas
+        PanelInferiorCafe(
+            gameState = gameState,
+            onGameStateChanged = onGameStateChanged,
+            onNotificacion = onNotificacion
+        )
     }
 }
 
 @Composable
-fun CafeStatsCard(
+fun CafeHeaderCompacto(
     gameState: GameState,
     eficiencia: Float,
     clientesActivos: Int
 ) {
     Card(
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
-            containerColor = when {
-                eficiencia > 0.8f -> Color(0xFFE8F5E8)
-                eficiencia > 0.5f -> Color(0xFFFFF3E0)
-                else -> Color(0xFFFFEBEE)
-            }
-        )
+            containerColor = Color(0xFF6D4C41) // Marrón café
+        ),
+        shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "☕ Mi Café - Nivel ${gameState.nivel}",
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold
-            )
+            // Status café
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("☕", fontSize = 20.sp)
+                Text(
+                    "Nivel ${gameState.nivel}",
+                    fontSize = 10.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            Text(
-                text = "XP: ${gameState.experiencia}/${gameState.calcularExperienciaParaSiguienteNivel()}",
-                fontSize = 10.sp
-            )
+            // Clientes
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("👥", fontSize = 20.sp)
+                Text(
+                    "$clientesActivos/3",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            LinearProgressIndicator(
-                progress = gameState.experiencia.toFloat() / gameState.calcularExperienciaParaSiguienteNivel(),
-                modifier = Modifier.fillMaxWidth().height(4.dp),
-                color = Color(0xFF4CAF50)
-            )
+            // Eficiencia
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("⚡", fontSize = 20.sp)
+                Text(
+                    "${(eficiencia * 100).toInt()}%",
+                    fontSize = 12.sp,
+                    color = if (eficiencia > 0.7f) Color(0xFF4CAF50) else Color(0xFFFFEB3B),
+                    fontWeight = FontWeight.Bold
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = "Clientes: $clientesActivos/3 | Eficiencia: ${(eficiencia * 100).toInt()}%",
-                fontSize = 10.sp
-            )
-
-            Text(
-                text = "Servidos hoy: ${gameState.clientesServidos}",
-                fontSize = 10.sp,
-                color = Color(0xFF4CAF50)
-            )
+            // Servidos hoy
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("🏆", fontSize = 20.sp)
+                Text(
+                    "${gameState.clientesServidos}",
+                    fontSize = 12.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
     }
 }
 
 @Composable
-fun ClienteCardAnimated(
+fun ClienteCardMejorada(
     cliente: Cliente,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
-    val escala by animateFloatAsState(
-        targetValue = if (isSelected) 1.1f else 1.0f,
+    val animatedScale by animateFloatAsState(
+        targetValue = if (isSelected) 1.05f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.8f)
+    )
+
+    val borderColor by animateColorAsState(
+        targetValue = if (isSelected) Color(0xFFFFEB3B) else Color.Transparent,
         animationSpec = tween(300)
     )
 
-    val colorFondo by animateColorAsState(
-        targetValue = when {
-            isSelected -> Color(0xFFFFEB3B)
-            cliente.paciencia < 20 -> Color(0xFFFFCDD2)
-            cliente.tipoCliente == TipoCliente.VIP -> Color(0xFFE1BEE7)
-            else -> Color(0xFFE8F5E8)
-        },
-        animationSpec = tween(500)
+    val backgroundBrush = when {
+        isSelected -> Brush.radialGradient(
+            colors = listOf(Color(0xFFFFEB3B), Color(0xFFFFF59D))
+        )
+        cliente.paciencia < 30 -> Brush.radialGradient(
+            colors = listOf(Color(0xFFFFCDD2), Color(0xFFEF9A9A))
+        )
+        cliente.tipoCliente == TipoCliente.VIP -> Brush.radialGradient(
+            colors = listOf(Color(0xFFE1BEE7), Color(0xFFCE93D8))
+        )
+        else -> Brush.radialGradient(
+            colors = listOf(Color(0xFFE8F5E8), Color(0xFFC8E6C9))
+        )
+    }
+
+    Card(
+        modifier = Modifier
+            .width(85.dp)
+            .height(110.dp)
+            .scale(animatedScale)
+            .border(2.dp, borderColor, RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+            .shadow(if (isSelected) 8.dp else 4.dp, RoundedCornerShape(16.dp)),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(backgroundBrush)
+                .padding(6.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // Emoji del cliente con animación si es VIP
+                val clienteRotacion by rememberInfiniteTransition().animateFloat(
+                    initialValue = if (cliente.tipoCliente == TipoCliente.VIP) -5f else 0f,
+                    targetValue = if (cliente.tipoCliente == TipoCliente.VIP) 5f else 0f,
+                    animationSpec = infiniteRepeatable(
+                        animation = tween(1000, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse
+                    )
+                )
+
+                Text(
+                    text = cliente.emoji,
+                    fontSize = 24.sp,
+                    modifier = Modifier.rotate(clienteRotacion)
+                )
+
+                // Pedido (más compacto)
+                Text(
+                    text = cliente.pedido,
+                    fontSize = 8.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                    fontWeight = if (cliente.tipoCliente == TipoCliente.VIP) FontWeight.Bold else FontWeight.Normal
+                )
+
+                // Precio con efectos
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "$${cliente.precio}",
+                        fontSize = 11.sp,
+                        color = Color(0xFF2E7D32),
+                        fontWeight = FontWeight.Bold
+                    )
+                    when (cliente.tipoCliente) {
+                        TipoCliente.GENEROSO -> Text("💰", fontSize = 10.sp)
+                        TipoCliente.VIP -> Text("👑", fontSize = 10.sp)
+                        TipoCliente.IMPACIENTE -> Text("⚡", fontSize = 10.sp)
+                        else -> {}
+                    }
+                }
+
+                // Barra de paciencia mejorada
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(Color.White.copy(alpha = 0.3f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth(cliente.paciencia / 100f)
+                            .fillMaxHeight()
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(
+                                when {
+                                    cliente.paciencia > 60 -> Color(0xFF4CAF50)
+                                    cliente.paciencia > 30 -> Color(0xFFFF9800)
+                                    else -> Color(0xFFE91E63)
+                                }
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EstadoSinClientesMejorado() {
+    val pulso by rememberInfiniteTransition().animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
     )
 
     Card(
         modifier = Modifier
-            .width(90.dp)
-            .height(120.dp)
-            .scale(escala)
-            .clickable { onClick() },
-        colors = CardDefaults.cardColors(containerColor = colorFondo)
+            .fillMaxWidth()
+            .height(100.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFFF3E5F5) // Lavanda claro
+        )
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(8.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.Center
         ) {
-            Text(text = cliente.emoji, fontSize = 24.sp)
-
             Text(
-                text = cliente.pedido,
-                fontSize = 8.sp,
-                maxLines = 2,
-                fontWeight = if (cliente.tipoCliente == TipoCliente.VIP) FontWeight.Bold else FontWeight.Normal
+                text = "☕",
+                fontSize = 32.sp,
+                modifier = Modifier.scale(pulso)
             )
-
-            Row {
-                Text(text = "$${cliente.precio}", fontSize = 10.sp, color = Color(0xFF2E7D32))
-                if (cliente.tipoCliente == TipoCliente.GENEROSO || cliente.tipoCliente == TipoCliente.VIP) {
-                    Text(text = " 💰", fontSize = 8.sp)
-                }
-            }
-
-            LinearProgressIndicator(
-                progress = cliente.paciencia / 100f,
-                modifier = Modifier.fillMaxWidth().height(4.dp),
-                color = when {
-                    cliente.paciencia > 60 -> Color.Green
-                    cliente.paciencia > 30 -> Color(0xFFFF9800)
-                    else -> Color.Red
-                }
-            )
-
-            // Indicador de tipo de cliente
             Text(
-                text = when (cliente.tipoCliente) {
-                    TipoCliente.IMPACIENTE -> "⚡"
-                    TipoCliente.GENEROSO -> "😊"
-                    TipoCliente.VIP -> "👑"
-                    else -> ""
-                },
-                fontSize = 10.sp
+                text = "Esperando clientes...",
+                fontSize = 14.sp,
+                color = Color(0xFF6A1B9A),
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                text = if ((8..20).random() % 2 == 0) "¡La fama de tu café se extiende!" else "¡Pronto llegarán clientes!",
+                fontSize = 10.sp,
+                color = Color(0xFF9C27B0)
             )
         }
     }
 }
 
 @Composable
-fun InventarioCard(inventario: Inventario) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
-    ) {
-        Column(
-            modifier = Modifier.padding(8.dp)
-        ) {
-            Text(
-                text = "📦 Inventario",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("☕ Básicos: ${inventario.ingredientesBasicos}", fontSize = 9.sp)
-                Text("🍫 Premium: ${inventario.ingredientesPremium}", fontSize = 9.sp)
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("🎂 Pasteles: ${inventario.pasteles}", fontSize = 9.sp)
-                Text("🍪 Galletas: ${inventario.galletas}", fontSize = 9.sp)
-            }
-        }
-    }
-}
-
-@Composable
-fun EstacionTrabajoMejorada(
+fun EstacionTrabajoVisual(
     cliente: Cliente,
     eficiencia: Float,
     inventario: Inventario,
@@ -339,76 +369,120 @@ fun EstacionTrabajoMejorada(
     var progreso by remember { mutableStateOf(0f) }
     val puedePreparar = inventario.puedePreparar(cliente.pasos)
 
+    // Colores temáticos según el cliente
+    val colorTema = when (cliente.tipoCliente) {
+        TipoCliente.VIP -> Color(0xFF9C27B0)
+        TipoCliente.IMPACIENTE -> Color(0xFFFF5722)
+        TipoCliente.GENEROSO -> Color(0xFF4CAF50)
+        else -> Color(0xFF2196F3)
+    }
+
     Card(
         modifier = Modifier.fillMaxSize(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (puedePreparar) Color(0xFFF8F8F8) else Color(0xFFFFEBEE)
+            containerColor = if (puedePreparar) Color.White else Color(0xFFFFEBEE)
         )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(16.dp)
         ) {
-            // Info del cliente y pedido
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            // Header del pedido estilizado
+            Card(
+                colors = CardDefaults.cardColors(containerColor = colorTema.copy(alpha = 0.1f)),
+                shape = RoundedCornerShape(12.dp)
             ) {
-                Column {
-                    Text("Preparando: ${cliente.pedido}", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                    Text("Cliente: ${cliente.emoji}", fontSize = 12.sp)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text("${cliente.precio}", fontSize = 14.sp, color = Color(0xFF2E7D32))
-                    Text(
-                        when (cliente.tipoCliente) {
-                            TipoCliente.VIP -> "👑 VIP"
-                            TipoCliente.IMPACIENTE -> "⚡ Rápido"
-                            TipoCliente.GENEROSO -> "💰 Generoso"
-                            else -> "😊 Normal"
-                        },
-                        fontSize = 10.sp
-                    )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = cliente.pedido,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colorTema
+                        )
+                        Text(
+                            text = "Cliente ${cliente.emoji}",
+                            fontSize = 12.sp,
+                            color = Color(0xFF666666)
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "$${cliente.precio}",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32)
+                        )
+                        Text(
+                            text = when (cliente.tipoCliente) {
+                                TipoCliente.VIP -> "👑 VIP"
+                                TipoCliente.IMPACIENTE -> "⚡ Rápido"
+                                TipoCliente.GENEROSO -> "💰 Generoso"
+                                else -> "😊 Normal"
+                            },
+                            fontSize = 10.sp,
+                            color = colorTema
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Pasos visuales con animación
-            LazyRow(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                items(cliente.pasos.size) { index ->
-                    val paso = cliente.pasos[index]
-                    val escalaAnimada by animateFloatAsState(
-                        targetValue = when {
-                            index < cliente.pasoActual -> 0.9f
-                            index == cliente.pasoActual && preparando -> 1.2f
-                            index == cliente.pasoActual -> 1.1f
-                            else -> 1.0f
-                        },
-                        animationSpec = spring(dampingRatio = 0.6f, stiffness = 100f)
-                    )
+            // Pasos de preparación visuales - Layout mejorado
+            Text(
+                text = "Proceso de preparación:",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF333333)
+            )
 
-                    Box(
-                        modifier = Modifier
-                            .size(50.dp)
-                            .scale(escalaAnimada)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    index < cliente.pasoActual -> Color(0xFF4CAF50)
-                                    index == cliente.pasoActual && preparando -> Color(0xFFFFEB3B)
-                                    index == cliente.pasoActual -> Color(0xFF2196F3)
-                                    else -> Color(0xFFE0E0E0)
-                                }
-                            ),
-                        contentAlignment = Alignment.Center
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Pasos en grid 2x2 o fila según cantidad
+            if (cliente.pasos.size <= 4) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    items(cliente.pasos.size) { index ->
+                        PasoVisualdeMejoradi(
+                            paso = cliente.pasos[index],
+                            index = index,
+                            pasoActual = cliente.pasoActual,
+                            preparando = preparando && index == cliente.pasoActual
+                        )
+                    }
+                }
+            } else {
+                // Grid para pedidos complejos
+                val rows = cliente.pasos.chunked(3)
+                rows.forEach { rowPasos ->
+                    LazyRow(
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(text = paso, fontSize = 18.sp)
+                        items(rowPasos.size) { localIndex ->
+                            val globalIndex = rows.indexOf(rowPasos) * 3 + localIndex
+                            PasoVisualdeMejoradi(
+                                paso = rowPasos[localIndex],
+                                index = globalIndex,
+                                pasoActual = cliente.pasoActual,
+                                preparando = preparando && globalIndex == cliente.pasoActual
+                            )
+                        }
+                    }
+                    if (rowPasos != rows.last()) {
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
             }
@@ -417,13 +491,47 @@ fun EstacionTrabajoMejorada(
 
             // Barra de progreso si está preparando
             if (preparando) {
-                Text("Preparando...", fontSize = 12.sp)
-                LinearProgressIndicator(
-                    progress = progreso,
-                    modifier = Modifier.fillMaxWidth().height(8.dp),
-                    color = Color(0xFF4CAF50)
-                )
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF3E0))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = "✨ Preparando ${cliente.pasos[cliente.pasoActual]}...",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
 
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color.White)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(progreso)
+                                    .fillMaxHeight()
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(
+                                        brush = Brush.horizontalGradient(
+                                            colors = listOf(colorTema, colorTema.copy(alpha = 0.7f))
+                                        )
+                                    )
+                            )
+                        }
+                    }
+                }
+
+                // Lógica de preparación
                 LaunchedEffect(preparando) {
                     val tiempoBase = 2000
                     val tiempoTotal = (tiempoBase / eficiencia).toLong().coerceAtLeast(500)
@@ -442,49 +550,71 @@ fun EstacionTrabajoMejorada(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
-            // Controles
+            // Botones de acción mejorados
             if (!puedePreparar) {
                 Card(
                     colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2))
                 ) {
-                    Text(
-                        text = "⚠️ Sin ingredientes suficientes",
-                        modifier = Modifier.padding(8.dp),
-                        fontSize = 12.sp,
-                        color = Color(0xFFD32F2F)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("⚠️", fontSize = 24.sp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Sin ingredientes suficientes para este pedido",
+                            fontSize = 12.sp,
+                            color = Color(0xFFD32F2F)
+                        )
+                    }
                 }
             } else if (!preparando) {
                 if (cliente.pasoActual < cliente.pasos.size) {
                     Button(
                         onClick = { preparando = true },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = when (cliente.tipoCliente) {
-                                TipoCliente.VIP -> Color(0xFF9C27B0)
-                                TipoCliente.IMPACIENTE -> Color(0xFFFF5722)
-                                else -> Color(0xFF2196F3)
-                            }
-                        )
+                        colors = ButtonDefaults.buttonColors(containerColor = colorTema),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Preparar ${cliente.pasos[cliente.pasoActual]}")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("✨", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Preparar ${cliente.pasos[cliente.pasoActual]}",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 } else {
                     Button(
                         onClick = { onPasoCompletado(cliente.copy(pasoActual = cliente.pasoActual + 1)) },
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("✨ Servir Cliente")
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🎉", fontSize = 16.sp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "¡Servir al Cliente!",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Info de eficiencia
+            // Info adicional compacta
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -509,42 +639,334 @@ fun EstacionTrabajoMejorada(
 }
 
 @Composable
-fun EstacionVaciaAnimada() {
+fun PasoVisualdeMejoradi(
+    paso: String,
+    index: Int,
+    pasoActual: Int,
+    preparando: Boolean
+) {
+    val escalaAnimada by animateFloatAsState(
+        targetValue = when {
+            index < pasoActual -> 0.8f
+            index == pasoActual && preparando -> 1.3f
+            index == pasoActual -> 1.1f
+            else -> 1.0f
+        },
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 150f)
+    )
+
+    val rotacionAnimada by rememberInfiniteTransition().animateFloat(
+        initialValue = if (preparando && index == pasoActual) -10f else 0f,
+        targetValue = if (preparando && index == pasoActual) 10f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Box(
+        modifier = Modifier
+            .size(55.dp)
+            .scale(escalaAnimada)
+            .rotate(rotacionAnimada)
+            .clip(CircleShape)
+            .background(
+                brush = when {
+                    index < pasoActual -> Brush.radialGradient(
+                        colors = listOf(Color(0xFF4CAF50), Color(0xFF2E7D32))
+                    )
+                    index == pasoActual && preparando -> Brush.radialGradient(
+                        colors = listOf(Color(0xFFFFEB3B), Color(0xFFFFC107))
+                    )
+                    index == pasoActual -> Brush.radialGradient(
+                        colors = listOf(Color(0xFF2196F3), Color(0xFF1565C0))
+                    )
+                    else -> Brush.radialGradient(
+                        colors = listOf(Color(0xFFE0E0E0), Color(0xFFBDBDBD))
+                    )
+                }
+            )
+            .border(
+                width = 2.dp,
+                color = when {
+                    index < pasoActual -> Color(0xFF4CAF50)
+                    index == pasoActual -> Color(0xFF2196F3)
+                    else -> Color.Transparent
+                },
+                shape = CircleShape
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = paso,
+            fontSize = 20.sp
+        )
+
+        // Checkmark para pasos completados
+        if (index < pasoActual) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(CircleShape)
+                    .background(Color.White)
+                    .align(Alignment.BottomEnd),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✓", fontSize = 12.sp, color = Color(0xFF4CAF50))
+            }
+        }
+    }
+}
+
+@Composable
+fun EstacionVaciaAnimadaMejorada() {
     val rotacion by rememberInfiniteTransition().animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
+            animation = tween(4000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
+        )
+    )
+
+    val pulso by rememberInfiniteTransition().animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
         )
     )
 
     Card(
         modifier = Modifier.fillMaxSize(),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White
+        ),
+        shape = RoundedCornerShape(20.dp)
     ) {
         Column(
             modifier = Modifier.fillMaxSize(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            // Icono animado
+            Box(
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(CircleShape)
+                    .background(
+                        brush = Brush.radialGradient(
+                            colors = listOf(
+                                Color(0xFFE3F2FD),
+                                Color(0xFFBBDEFB)
+                            )
+                        )
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "☕",
+                    fontSize = 32.sp,
+                    modifier = Modifier
+                        .rotate(rotacion)
+                        .scale(pulso)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             Text(
-                text = "🔧",
-                fontSize = 36.sp,
-                modifier = Modifier.rotate(rotacion)
+                "Estación de trabajo lista",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1565C0)
             )
+
             Spacer(modifier = Modifier.height(8.dp))
+
             Text(
-                "Selecciona un cliente para empezar",
+                "Selecciona un cliente para comenzar",
                 fontSize = 14.sp,
-                color = Color(0xFF757575)
+                color = Color(0xFF757575),
+                textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "Tip: Clientes VIP 👑 y Generosos 💰 dan más dinero",
-                fontSize = 10.sp,
-                color = Color(0xFF9E9E9E)
-            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Tips aleatorios
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFF3E5F5))
+            ) {
+                Text(
+                    text = listOf(
+                        "💡 Los clientes VIP 👑 pagan más pero son más exigentes",
+                        "💡 Los clientes generosos 💰 dan propina si los atiendes rápido",
+                        "💡 ¡Tu eficiencia mejora con mejor energía y ánimo!",
+                        "💡 Los clientes impacientes ⚡ se van rápido pero pagan extra"
+                    ).random(),
+                    fontSize = 11.sp,
+                    color = Color(0xFF6A1B9A),
+                    modifier = Modifier.padding(12.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
         }
+    }
+}
+
+@Composable
+fun PanelInferiorCafe(
+    gameState: GameState,
+    onGameStateChanged: (GameState) -> Unit,
+    onNotificacion: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Inventario compacto
+        Card(
+            modifier = Modifier.weight(1f),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Text(
+                    text = "📦 Stock",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF5D4037)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    IngredienteIndicador("☕", gameState.inventario.ingredientesBasicos)
+                    IngredienteIndicador("🍫", gameState.inventario.ingredientesPremium)
+                    IngredienteIndicador("🎂", gameState.inventario.pasteles)
+                    IngredienteIndicador("🍪", gameState.inventario.galletas)
+                }
+            }
+        }
+
+        // Botón de compra mejorado
+        if (gameState.dinero >= 50) {
+            Button(
+                onClick = {
+                    val nuevoInventario = gameState.inventario.copy(
+                        ingredientesBasicos = gameState.inventario.ingredientesBasicos + 20,
+                        ingredientesPremium = gameState.inventario.ingredientesPremium + 10,
+                        pasteles = gameState.inventario.pasteles + 5,
+                        galletas = gameState.inventario.galletas + 8
+                    )
+                    onGameStateChanged(
+                        gameState.copy(
+                            inventario = nuevoInventario,
+                            dinero = gameState.dinero - 50
+                        )
+                    )
+                    onNotificacion("📦 ¡Stock reabastecido! -$50")
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("🛒", fontSize = 16.sp)
+                    Text("$50", fontSize = 10.sp)
+                }
+            }
+        } else {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFCDD2)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(8.dp)
+                ) {
+                    Text("💰", fontSize = 16.sp)
+                    Text("Sin dinero", fontSize = 8.sp, color = Color(0xFFD32F2F))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun IngredienteIndicador(emoji: String, cantidad: Int) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(emoji, fontSize = 14.sp)
+        Text(
+            text = cantidad.toString(),
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = when {
+                cantidad > 10 -> Color(0xFF4CAF50)
+                cantidad > 5 -> Color(0xFFFF9800)
+                else -> Color(0xFFE91E63)
+            }
+        )
+    }
+}
+
+// Función auxiliar para procesar cliente completado
+private fun procesarClienteCompletado(
+    clienteActualizado: Cliente,
+    clientesActivos: List<Cliente>,
+    gameState: GameState,
+    onGameStateChanged: (GameState) -> Unit,
+    onClientesChanged: (List<Cliente>) -> Unit,
+    onClienteSeleccionado: (Int?) -> Unit,
+    onNotificacion: (String) -> Unit
+) {
+    if (clienteActualizado.pasoActual >= clienteActualizado.pasos.size) {
+        // Cliente completado - calcular ganancias
+        val tiempoServicio = 3000L // Simulado
+        val propina = GameLogic.calcularPropina(tiempoServicio, clienteActualizado)
+        val gananciaTotal = clienteActualizado.precio + propina
+        val experienciaGanada = when (clienteActualizado.tipoCliente) {
+            TipoCliente.VIP -> 15
+            TipoCliente.IMPACIENTE -> 10
+            TipoCliente.GENEROSO -> 8
+            else -> 5
+        }
+
+        // Consumir ingredientes
+        val nuevoInventario = gameState.inventario.consumirIngredientes(clienteActualizado.pasos)
+
+        // Actualizar estado del juego
+        val nuevoGameState = gameState.copy(
+            dinero = gameState.dinero + gananciaTotal,
+            experiencia = gameState.experiencia + experienciaGanada,
+            clientesServidos = gameState.clientesServidos + 1,
+            inventario = nuevoInventario
+        ).subirNivel()
+
+        onGameStateChanged(nuevoGameState)
+        onClientesChanged(clientesActivos.filter { it.id != clienteActualizado.id })
+        onClienteSeleccionado(null)
+
+        // Mensaje personalizado según el resultado
+        val mensaje = when {
+            propina > 0 -> "🎉 +${gananciaTotal} (¡+${propina} propina!)"
+            clienteActualizado.tipoCliente == TipoCliente.VIP -> "👑 Cliente VIP satisfecho: +${gananciaTotal}"
+            else -> "✅ Cliente feliz: +${gananciaTotal}"
+        }
+        onNotificacion(mensaje)
+    } else {
+        // Actualizar paso del cliente
+        onClientesChanged(
+            clientesActivos.map {
+                if (it.id == clienteActualizado.id) clienteActualizado else it
+            }
+        )
     }
 }
